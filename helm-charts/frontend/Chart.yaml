@@ -1,0 +1,9 @@
+apiVersion: v2
+description: A Helm chart for Sock Shop frontend
+name: frontend-chart
+version: 0.3.0
+
+dependencies:
+  - name: nginx-ingress
+    version: "2.0.0"
+    repository: "https://helm.nginx.com/stable"

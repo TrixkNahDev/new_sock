@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stunnel-config-user
+  labels:
+    app: stunnel
+data:
+  stunnel.conf: |
+    debug = 4
+    foreground = yes
+    client = yes
+
+    [documentdb]
+    accept = 127.0.0.1:27017
+    connect = my-cluster.cluster-abcdefg.us-east-1.docdb.amazonaws.com:27017
+
+    CAfile = /etc/ssl/certs/docdb-ca-bundle.pem
+    verifyChain = 2
+    checkHost = my-cluster.cluster-abcdefg.us-east-1.docdb.amazonaws.com

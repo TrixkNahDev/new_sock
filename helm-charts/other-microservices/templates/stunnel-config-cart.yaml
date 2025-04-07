@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stunnel-config-carts
+data:
+  stunnel.conf: |
+    foreground = yes
+    debug = info
+    [docdb]
+    client = yes
+    accept = 127.0.0.1:27017
+    connect = sockshop-docdb-cluster.cluster-cadqyg8as50n.us-east-1.docdb.amazonaws.com:27017
+    verify = 2
+    CAfile = /etc/ssl/certs/docdb-ca-bundle.pem
+    options = NO_SSLv2
+    options = NO_SSLv3

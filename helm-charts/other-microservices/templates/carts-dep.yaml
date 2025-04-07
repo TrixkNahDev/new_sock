@@ -1,0 +1,98 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: carts
+  labels:
+    name: carts
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: carts
+  template:
+    metadata:
+      labels:
+        name: carts
+      {{- if .Values.istio.enabled }}
+      annotations:
+        sidecar.istio.io/rewriteAppHTTPProbers: "true"
+      {{- end }}
+    spec:
+      containers:
+      # Container principal - Application carts
+      - command:
+        - /usr/local/bin/java.sh
+        - -jar
+        - ./app.jar
+        - --port={{ .Values.carts.containerPort }}
+        name: carts
+        image: {{if .Values.global.registry}}{{ .Values.global.registry }}/{{end}}{{ .Values.carts.image.repo }}:{{ .Values.carts.image.tag }}
+        env:
+         {{- if .Values.zipkin.enabled }}
+         - name: ZIPKIN
+           value: {{ .Values.zipkin.url }}
+         {{- end }}
+         - name: JAVA_OPTS
+           value: {{ .Values.java.options }}
+         # Configuration MongoDB via Stunnel (localhost:27018)
+         - name: spring.data.mongodb.uri
+           value: "mongodb://{{ .Values.mongodb.username }}:{{ .Values.mongodb.password }}@127.0.0.1:27018/{{ .Values.mongodb.database }}?retryWrites=false"
+        resources:
+{{ toYaml .Values.carts.resources | indent 10 }}
+        ports:
+         - containerPort: {{ .Values.carts.containerPort }}
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+{{- if lt (int .Values.carts.containerPort) 1024 }}
+          capabilities:
+            drop:
+              - all
+            add:
+              - NET_BIND_SERVICE
+{{- end }}
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp-volume
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.carts.containerPort }}
+          initialDelaySeconds: 420
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.carts.containerPort }}
+          initialDelaySeconds: 360
+          periodSeconds: 3
+
+      # Sidecar Stunnel pour DocumentDB TLS
+      - name: stunnel
+        image: {{ .Values.stunnel.image | default "dweomer/stunnel" }}
+        volumeMounts:
+        - mountPath: /etc/ssl/certs
+          name: ca-cert
+        - mountPath: /etc/stunnel
+          name: stunnel-config
+        command: ["stunnel", "/etc/stunnel/stunnel.conf"]
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+
+      volumes:
+      # Volume pour les fichiers temporaires
+      - name: tmp-volume
+        emptyDir:
+          medium: Memory
+      # Volume pour le certificat CA DocumentDB
+      - name: ca-cert
+        secret:
+          secretName: docdb-ca-cert
+      # Volume pour la configuration Stunnel
+      - name: stunnel-config
+        configMap:
+          name: stunnel-config-carts

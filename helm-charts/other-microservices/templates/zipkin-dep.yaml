@@ -1,0 +1,48 @@
+{{- if .Values.zipkin.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zipkin
+  labels:
+    name: zipkin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: zipkin
+  template:
+    metadata:
+      labels:
+        name: zipkin
+    spec:
+      containers:
+      - name: zipkin
+        image: {{if .Values.global.registry}}{{ .Values.global.registry }}/{{end}}{{ .Values.zipkin.image.repo }}:{{ .Values.zipkin.image.tag }}
+
+        # Configuration de la base de données MySQL pour Zipkin via RDS
+        # depuis values.yaml et le Secret mysql-rds-credentials
+        env:
+          - name: STORAGE_TYPE
+            value: mysql
+          - name: MYSQL_HOST
+            value: {{ .Values.mysql.host }}
+          - name: MYSQL_PORT
+            value: "{{ .Values.mysql.port }}"
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.mysql.secretName }}
+                key: username
+          - name: MYSQL_PASS
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.mysql.secretName }}
+                key: password
+          - name: MYSQL_DB
+            value: {{ .Values.mysql.database }}
+
+        ports:
+        - containerPort: 9411
+        resources:
+{{ toYaml .Values.zipkinmysql.resources | indent 10 }}
+{{- end -}}

@@ -1,0 +1,41 @@
+global:
+    registry: ''
+
+controller:
+    service:
+        type: LoadBalancer
+
+istio:
+    enabled: false
+
+frontend:
+    replicas: 1
+    image:
+        repo: socksshop/front-end
+        tag: latest
+    resources:
+        limits:
+            cpu: 300m
+            memory: 1000Mi
+        requests:
+            cpu: 100m
+            memory: 300Mi
+
+# frontend:
+#     replicas: 1
+#     image:
+#         repo: socksshop/front-end
+#         tag: latest
+#     resources:
+#         limits:
+#             cpu: 150m
+#             memory: 500Mi
+#         requests:
+#             cpu: 50m
+#             memory: 150Mi
+
+ingress:
+    labels: {}
+    ingressClassName: nginx
+    host: sockshop.ip-ddns.com
+    tlsSecretName: ''

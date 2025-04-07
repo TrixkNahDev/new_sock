@@ -1,0 +1,82 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalogue
+  labels:
+    name: catalogue
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: catalogue
+  template:
+    metadata:
+      labels:
+        name: catalogue
+      {{- if .Values.istio.enabled }}
+      annotations:
+        sidecar.istio.io/rewriteAppHTTPProbers: "true"
+      {{- end }}
+    spec:
+      containers:
+      - name: catalogue
+        image: {{if .Values.global.registry}}{{ .Values.global.registry }}/{{end}}{{ .Values.catalogue.image.repo }}:{{ .Values.catalogue.image.tag }}
+        command: ["/app"]
+        args:
+          - -port={{ .Values.catalogue.containerPort }}
+
+        # Configuration des variables d'environnement pour la connexion à l'instance RDS MySQL
+        # depuis values.yaml et un Secret Kubernetes, permettant au microservice catalogue de se connecter à RDS
+        env:
+          - name: MYSQL_HOST
+            value: {{ .Values.mysql.host }}
+          - name: MYSQL_PORT
+            value: "{{ .Values.mysql.port }}"
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.mysql.secretName }}
+                key: username
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.mysql.secretName }}
+                key: password
+          - name: MYSQL_DATABASE
+            value: {{ .Values.mysql.database }}  # Utilise "sockshop" depuis values.yaml
+          
+          - name: DSN
+            value: "$(MYSQL_USER):$(MYSQL_PASSWORD)@tcp($(MYSQL_HOST):$(MYSQL_PORT))/$(MYSQL_DATABASE)"
+          {{- if .Values.zipkin.enabled }}
+          - name: ZIPKIN
+            value: http://{{ .Values.zipkin.url }}:9411/api/v1/spans
+          {{- end }}
+
+        resources:
+{{ toYaml .Values.catalogue.resources | indent 10 }}
+        ports:
+        - containerPort: {{ .Values.catalogue.containerPort }}
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+{{- if lt (int .Values.carts.containerPort) 1024 }}
+          capabilities:
+            drop:
+              - all
+            add:
+              - NET_BIND_SERVICE
+{{- end }}
+          readOnlyRootFilesystem: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.catalogue.containerPort }}
+          initialDelaySeconds: 300
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: {{ .Values.catalogue.containerPort }}
+          initialDelaySeconds: 180
+          periodSeconds: 3
